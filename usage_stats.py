@@ -161,6 +161,12 @@ def main():
     per_archetype_by_cut: Dict[str, Counter] = defaultdict(Counter)
     per_deck_cut_total = Counter()
 
+    per_card_by_archetype: Dict[str, Counter] = defaultdict(Counter)       # card -> archetype -> deck count (presence)
+    per_card_qty_by_archetype: Dict[str, Counter] = defaultdict(Counter)   # card -> archetype -> total qty
+
+    per_archetype_card_presence: Dict[str, Counter] = defaultdict(Counter) # archetype -> card -> deck count (presence)
+    per_archetype_card_qty: Dict[str, Counter] = defaultdict(Counter)      # archetype -> card -> total qty
+
     processed = 0
     for evt in events:
         slug = (evt.get("slug") or evt.get("event", {}).get("slug") or evt.get("abbreviation"))
@@ -267,6 +273,18 @@ def main():
                     per_deck_cut_total[tier] += 1
                     per_archetype_by_cut[archetype][tier] += 1
 
+                # ------- NEW: per card x archetype tallies -------
+                # presence = card appears at least once in this deck
+                for card in set(counts.keys()):
+                    per_card_by_archetype[card][archetype] += 1
+                    per_archetype_card_presence[archetype][card] += 1
+
+                # quantity = sum of copies in this deck
+                for card, qty in counts.items():
+                    per_card_qty_by_archetype[card][archetype] += qty
+                    per_archetype_card_qty[archetype][card] += qty
+                # -----------------------------------------------
+
         processed += 1
         print(f"Processed {processed} events...", file=sys.stderr)
 
@@ -287,6 +305,10 @@ def main():
             "per_archetype_total: number of decks per archetype (each deck counted once)",
             "per_archetype_by_cut: number of decks of that archetype that made each cut tier",
             "per_deck_cut_total: total decks that reached each cut tier (all archetypes)",
+            "per_card_by_archetype: for each card, how many decks of each archetype included it (presence).",
+            "per_card_qty_by_archetype: for each card, total copies across decks of each archetype.",
+            "per_archetype_card_presence: for each archetype, how many decks used each card (presence).",
+            "per_archetype_card_qty: for each archetype, total copies of each card.",
         ],
         "per_card_total": dict(per_card_total),
         "per_card_by_cut": {k: dict(v) for k, v in per_card_by_cut.items()},
@@ -310,6 +332,11 @@ def main():
         "per_archetype_total": dict(per_archetype_total),
         "per_archetype_by_cut": {k: dict(v) for k, v in per_archetype_by_cut.items()},
         "per_deck_cut_total": dict(per_deck_cut_total),
+
+        "per_card_by_archetype": {card: dict(cnt) for card, cnt in per_card_by_archetype.items()},
+        "per_card_qty_by_archetype": {card: dict(cnt) for card, cnt in per_card_qty_by_archetype.items()},
+        "per_archetype_card_presence": {arch: dict(cnt) for arch, cnt in per_archetype_card_presence.items()},
+        "per_archetype_card_qty": {arch: dict(cnt) for arch, cnt in per_archetype_card_qty.items()},
     }
 
     with open(args.out, "w", encoding="utf-8") as f:
